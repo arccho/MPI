@@ -1,0 +1,53 @@
+import glob
+import os.path
+import re
+import subprocess
+
+SetOption('implicit_cache', 1)
+SetOption('warn', ['no-corrupt-sconsign'])
+Decider('MD5')
+
+colors = {}
+colors['cyan']   = '\033[96m'
+colors['purple'] = '\033[95m'
+colors['blue']   = '\033[94m'
+colors['green']  = '\033[92m'
+colors['yellow'] = '\033[93m'
+colors['red']    = '\033[91m'
+colors['end']    = '\033[0m'
+
+defenv = DefaultEnvironment()
+
+# Colory goodness.
+for pair in [(defenv, 'CC'), (defenv, 'CXX'), (defenv, 'LINK')]:
+	env = pair[0]
+	name = pair[1]
+
+	defout = env[name+'COM']
+	defout = re.sub('^\$'+name, colors['cyan']+'$'+name+colors['end'], defout)
+	defout = re.sub('\$TARGET', colors['red']+'$TARGET'+colors['end'], defout)
+	defout = re.sub('\$SOURCES', colors['green']+'$SOURCES'+colors['end'], defout)
+	env[name+'COMSTR'] = defout
+
+defenv.Replace(CC = 'mpicc')
+defenv.Replace(CCFLAGS = '-Wall -std=gnu11')
+defenv.Replace(LIBS = '-lm')
+
+bugenv = defenv.Clone()
+bugenv.Replace(CCFLAGS = ['-g', '-std=gnu11'])
+debugs = ['debug']
+
+sources = ['./']
+objects = ['obj/'+src for src in sources]
+
+for obj, src in zip(objects, sources):
+	defenv.VariantDir(obj, src, duplicate=0)
+
+for folder in objects:
+	for src in Glob(folder + '*.c'):
+		src = str(src)
+		executable = src[:-2]
+
+		env = defenv
+		env.Program(target = executable, source = 'obj/'+src, _CCCOMCOM = defenv.subst('$_CCCOMCOM'), _LIBDIRFLAGS = defenv.subst('$_LIBDIRFLAGS'))
+
